@@ -1,0 +1,75 @@
+#include <Firmata.h>
+byte analogPin = 0;
+unsigned long myTime;
+boolean shellVideoPlayedOnce = false;
+
+void analogWriteCallback(byte pin, int value)
+{
+  if (IS_PIN_PWM(pin)) {
+    pinMode(PIN_TO_DIGITAL(pin), OUTPUT);
+    analogWrite(PIN_TO_PWM(pin), value);
+  }
+}
+
+void setup()
+{
+  Firmata.setFirmwareVersion(FIRMATA_FIRMWARE_MAJOR_VERSION, FIRMATA_FIRMWARE_MINOR_VERSION);
+  Firmata.attach(ANALOG_MESSAGE, analogWriteCallback);
+  Firmata.begin(57600);
+}
+
+void loop()
+{
+  while (Firmata.available()) {
+    Firmata.processInput();
+  }
+  // do one analogRead per loop, so if PC is sending a lot of
+  // analog write messages, we will only delay 1 analogRead
+  delay(100);
+  if(analogPin == 4){ 
+    int myIndex = getIndex();
+    if(myIndex > 100){
+      myTime = millis();
+      while(millis() < myTime + 20000)
+      Firmata.sendAnalog(analogPin, myIndex);
+      delay(500);
+    }
+    else{
+      Firmata.sendAnalog(analogPin, myIndex);
+      delay(200);
+    }  
+    
+    delay(500);   
+
+    if(myIndex == 175)
+      shellVideoPlayedOnce = true;
+  }
+  else
+    Firmata.sendAnalog(analogPin, analogRead(analogPin));
+    
+  analogPin = analogPin + 1;
+  if (analogPin >= 5) analogPin = 0;
+}
+
+int getIndex(){
+  int IndexTimes50 = 0;
+  byte aPin = 0;
+  if(analogRead(aPin) < 190){//person setting and light down
+    IndexTimes50 = 75;
+    if(analogRead(aPin+1) > 650){//water level going above a bit
+      IndexTimes50 = 125;
+    }
+    if(analogRead(aPin+2) > 800 && !shellVideoPlayedOnce){//flex sensor open goes up
+        IndexTimes50 = 175;
+    }
+    else if (analogRead(aPin+2) < 750){
+        shellVideoPlayedOnce = false;
+    }
+    if(analogRead(aPin+3) > 800){//touch goes to 1
+       IndexTimes50 = 225;
+    }      
+   }
+  
+  Serial.println("Index" + IndexTimes50);
+  return IndexTimes50;
+}
